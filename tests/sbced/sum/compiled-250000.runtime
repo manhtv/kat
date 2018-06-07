@@ -1,0 +1,13 @@
+<imp>
+  <k>
+    END
+  </k>
+  <mem>
+    n |-> -1
+    s |-> 31250125000
+  </mem>
+</imp>
+
+real	0m7.389s
+user	0m12.183s
+sys	0m0.728s

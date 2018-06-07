@@ -1,0 +1,15 @@
+<imp>
+  <k>
+    END
+  </k>
+  <mem>
+    b |-> 700
+    c |-> 701
+    n |-> 1
+    x |-> 39280
+  </mem>
+</imp>
+
+real	0m5.802s
+user	0m10.660s
+sys	0m0.689s

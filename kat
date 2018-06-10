@@ -9,6 +9,7 @@ mkdir -p "$test_logs"
 
 test_expected_dir="tests/output"
 test_output_dir="$test_logs/output"
+test_sbced_dir="tests/sbced"
 mkdir -p "$test_expected_dir" "$test_output_dir"
 
 # Utilities
@@ -28,6 +29,9 @@ pretty_diff() {
 run_env() {
     local release_dir="$build_dir/k/k-distribution/target/release/k"
     export PATH="$release_dir/lib/native/linux:$release_dir/lib/native/linux64:$release_dir/bin/:$PATH"
+    export PATH="$release_dir/lib/native/linux:$release_dir/lib/native/linux64:$release_dir/bin/:$PATH"
+    export LD_LIBRARY_PATH="$release_dir/lib/native/linux64:$lib_dir:${LD_LIBRARY_PATH:-}"
+    eval $(opam config env)
 }
 
 # Runners
@@ -99,6 +103,19 @@ run_test() {
     return "$exit_status"
 }
 
+run_perf() {
+    local imp_file input_param
+
+    imp_file="$1"   && shift
+    test_input="$1" && shift
+    test_dir="$test_sbced_dir/${imp_file%.imp}"
+
+    run_env
+
+    time ( krun --directory "$build_dir/defn/krun" "tests/$imp_file" ) &> "$test_dir/$test_input.original"
+    time ( krun --directory "$test_dir" -cN="$test_input"            ) &> "$test_dir/$test_input.compiled"
+}
+
 # Main
 # ----
 
@@ -115,6 +132,7 @@ case "$run_command" in
 
     # Testing
     test) run_test "$@" ;;
+    perf) run_perf "$@" ;;
 
     *) echo "
     usage: $0 [run|debug|search] <file> <strategy> <K args>*
@@ -131,10 +149,12 @@ case "$run_command" in
        # Testing
        # -------
        $0 test <pgm> <strat> [<strat-num>] Run a test from the `tests/` directory.
+       $0 perf <pgm> <N>                   Run performance measures on (un)compiled with input size.
 
        Note: <pgm>          is the path to the program in `tests/`
              <strat>        is a file with one strategy per line
              <strat-num>    is which strategy from <strat> to run (default '*')
+             <N>            input size to use for performance run
 
        Note: This command is more for devs and CI servers.
 " ; exit ;;

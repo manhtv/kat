@@ -125,13 +125,13 @@ Lists of expressions are declared strict, so all expressions in the list get eva
     syntax ConstructorName
     syntax ClosureVal
     syntax ConstructorVal ::= ConstructorName
-                            | ConstructorVal Val [left]
- // ---------------------------------------------------
+                            | ConstructorVal Val [left, klabel(constructorApplication)]
+ // -----------------------------------------------------------------------------------
 
     syntax ApplicableVal ::= ConstructorVal
                            | ClosureVal
-                           | ApplicableVal Val [left]
- // -------------------------------------------------
+                           | ApplicableVal Val [left, klabel(applicableApplication)]
+ // --------------------------------------------------------------------------------
 
     syntax Val ::= Int | Bool | String
                  | ApplicableVal
@@ -158,18 +158,18 @@ FUN's builtin lists are `_:_` separated cons-lists like many functional language
 A list is turned back into a regular element by wrapping it in the `[_]` operator.
 
 ```k
-    syntax Exps ::= Vals
-    syntax Vals ::= Val | ".Vals" [klabel(.Vals)] | Val ":" Vals
-    syntax Exps ::= Exp | ".Exps" [klabel(.Vals)] | Exp ":" Exps
- // ------------------------------------------------------------
+    syntax Exps ::= Vals | Name
+    syntax Vals ::= ".Vals" [klabel(.Vals)] | Val ":" Vals [klabel(valCons)]
+    syntax Exps ::= ".Exps" [klabel(.Vals)] | Exp ":" Exps [klabel(expCons)]
+ // ------------------------------------------------------------------------
 
-    syntax Val ::= "[" Vals "]"
+    syntax Val ::= "[" Vals "]" [klabel(valList)]
     syntax Exp ::= "[" Exps "]" [strict]
  // ------------------------------------
 
-    syntax Exp ::= "[" "]" [function]
+    syntax Val ::= "[" "]" [function]
  // ---------------------------------
-    rule [ ] => [ .Vals ]
+    rule [ ] => valList(.Vals)
 ```
 
 ### Expressions
@@ -451,13 +451,12 @@ Lists must be handled carefully, because not every `ClosureVal` should be consid
 ```k
     syntax KItem ::= "#consHead" Val | "#consTail" Exps
  // ---------------------------------------------------
-    rule <k> E : ES => E ~> #consTail ES ... </k>
-      requires notBool areFullyEvaluated(E : ES)
+    rule <k> expCons(E, ES) => E ~> #consTail ES ... </k>
 
     rule <k> V ~> #consTail ES => ES ~> #consHead V ... </k>
       requires isFullyEvaluated(V)
 
-    rule <k> VS ~> #consHead V => V : VS ... </k>
+    rule <k> VS ~> #consHead V => valCons(V, VS) ... </k>
       requires areFullyEvaluated(VS)
 ```
 
@@ -516,7 +515,7 @@ In evaluating an application, the arguments are evaluated in reverse order until
       requires notBool isVal(E)
       [tag(applicationFocusFunction)]
 
-    rule <k> CV:ConstructorVal ~> #arg(V) => CV V ... </k>
+    rule <k> CV:ConstructorVal ~> #arg(V) => constructorApplication(CV, V) ... </k>
 
     rule <k> E E':Exp => E' ~> #apply(E) ... </k>
       requires notBool isVal(E')
@@ -524,6 +523,7 @@ In evaluating an application, the arguments are evaluated in reverse order until
 
     rule <k> V:Val ~> #apply(E) => E V ... </k>
       requires isFullyEvaluated(V)
+      [tag(applicationCoolArgument)]
 ```
 
 Finally, once all arguments are evaluated, we can attempt pattern matching on the closure's function contents.
@@ -580,11 +580,11 @@ The following helpers actually do the allocation and assignment operations on th
 
     rule <k> .Vals ~> #assign(.Names) => . ... </k>
 
-    rule <k> (#listTailMatch(V) : VS => VS) ~> #assign(X , XS => XS) ... </k>
+    rule <k> (valCons(#listTailMatch(V), VS) => VS) ~> #assign(X , XS => XS) ... </k>
          <env> ENV => ENV[X <- V] </env>
       [tag(listAssignment)]
 
-    rule <k> (V:Val : VS => VS) ~> #assign(X , XS => XS) ... </k>
+    rule <k> (valCons(V, VS) => VS) ~> #assign(X , XS => XS) ... </k>
          <env> ENV => ENV[X <- V] </env>
       requires notBool #isListTailMatch(V)
       [tag(assignment)]
@@ -601,7 +601,7 @@ This machinery actually ensures that the recursive expressions know which values
     syntax Val   ::= #applyMuVal  ( Names , Val  ) [function]
  // ---------------------------------------------------------
     rule #applyMuVals(XS, .Vals)  => .Vals
-    rule #applyMuVals(XS, V : VS) => #applyMuVal(XS, V) : #applyMuVals(XS, VS)
+    rule #applyMuVals(XS, V : VS) => valCons(#applyMuVal(XS, V), #applyMuVals(XS, VS))
 
     rule #applyMuVal(XS, V)                => V requires notBool isClosureVal(V)
     rule #applyMuVal(XS, closure(RHO, CS)) => closure(RHO, #applyMuCases(XS, CS))
@@ -634,7 +634,7 @@ If the resulting closure invokes the stored `cc(RHO, K)`, the current state is r
 
     rule <k> cc(RHO, K) ~> #arg(V) ~> _ => setEnv(RHO) ~> V ~> K </k>
 
-    rule <k> closure(RHO, CS) cc(RHO', K) => closure(RHO, CS) ~> #arg(cc(RHO', K)) ... </k>
+    rule <k> applicableApplication(closure(RHO, CS), cc(RHO', K)) => closure(RHO, CS) ~> #arg(cc(RHO', K)) ... </k>
 ```
 
 Auxiliary operations
@@ -700,13 +700,13 @@ The following auxiliary operations extract the list of identifiers and of expres
     rule <k> getMatching(C:ConstructorName , C':ConstructorName) => matchResult(.Bindings) ... </k> requires C  ==K C' [tag(caseConstructorNameSuccess)]
     rule <k> getMatching(C:ConstructorName , C':ConstructorName) => matchFailure           ... </k> requires C =/=K C' [tag(caseConstructorNameFailure)]
 
-    rule <k> getMatching(E:Exp E':Exp , CV:ConstructorVal V':Val) => getMatching(E, CV) ~> getMatching(E', V') ... </k>                                                      [tag(caseConstructorArgsSuccess)]
-    rule <k> getMatching(E:Exp E':Exp , CN:ConstructorName      ) => matchFailure                              ... </k>                                                      [tag(caseConstructorArgsFailure1)]
-    rule <k> getMatching(E:Exp        , CV:ConstructorVal V':Val) => matchFailure                              ... </k> requires notBool (isName(E) orBool isApplication(E)) [tag(caseConstructorArgsFailure2)]
+    rule <k> getMatching(E:Exp E':Exp , CN:ConstructorName                               ) => matchFailure                              ... </k>                                                      [tag(caseConstructorArgsFailure1)]
+    rule <k> getMatching(E:Exp E':Exp , constructorApplication(CV:ConstructorVal, V':Val)) => getMatching(E, CV) ~> getMatching(E', V') ... </k>                                                      [tag(caseConstructorArgsSuccess)]
+    rule <k> getMatching(E:Exp        , constructorApplication(CV:ConstructorVal, V':Val)) => matchFailure                              ... </k> requires notBool (isName(E) orBool isApplication(E)) [tag(caseConstructorArgsFailure2)]
 
     rule <k> getMatching([ES:Exps], [VS:Vals]) => getMatchings(ES, VS) ... </k> [tag(caseListSuccess)]
 
-    rule <k> getMatchings(E:Exp,             .Vals            ) => matchFailure                              ... </k> requires notBool isName(E) [tag(caseListEmptyFailure1)]
+ // rule <k> getMatchings(E:Exp,             .Vals            ) => matchFailure                              ... </k> requires notBool isName(E) [tag(caseListEmptyFailure1)]
     rule <k> getMatchings((_:Exp : _:Exps ), .Vals            ) => matchFailure                              ... </k>                            [tag(caseListEmptyFailure2)]
     rule <k> getMatchings(.Exps,             (_:Val : _:Vals) ) => matchFailure                              ... </k>                            [tag(caseListEmptyFailure3)]
     rule <k> getMatchings(.Exps,             .Vals            ) => matchResult(.Bindings)                    ... </k>                            [tag(caseListEmptySuccess)]

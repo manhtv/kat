@@ -48,6 +48,7 @@ Here the definition of a `State` for FUN is given, as well as the definitions of
     rule #normal => ^ lookup
                   | ^ applicationFocusFunction
                   | ^ applicationFocusArgument
+                  | ^ applicationCoolArgument
                   | ^ listAssignment
                   | ^ assignment
                   | ^ allocate
@@ -113,13 +114,15 @@ module FUN-SBC
            ...
          </FUN>
 
-    syntax Strategy ::= #abstract ( Set )
- // -------------------------------------
-    rule <s> #abstract(.Set) => . ... </s>
+    syntax KItem ::= #abstract     ( Set  )
+                   | #abstractName ( Name )
+ // ---------------------------------------
+    rule <s> #abstract(.Set)          => .                                 ... </s>
+    rule <s> #abstract(SetItem(X) XS) => #abstractName(X) ~> #abstract(XS) ... </s>
 
-    rule <s> #abstract((SetItem(X) => .Set) XS) ... </s> <env> ... X |-> E:Exp                     ... </env>
-    rule <s> #abstract((SetItem(X) => .Set) XS) ... </s> <env> ... X |-> (V  => #abstractVal(V))   ... </env>
-    rule <s> #abstract((SetItem(X) => .Set) XS) ... </s> <env> ... X |-> (VS => #abstractVals(VS)) ... </env>
+ // rule <s> #abstractName(X) => . ... </s> <env> ... X |-> E:Exp                     ... </env>
+    rule <s> #abstractName(X) => . ... </s> <env> ... X |-> (V  => #abstractVal(V))   ... </env>
+    rule <s> #abstractName(X) => . ... </s> <env> ... X |-> (VS => #abstractVals(VS)) ... </env>
 
     syntax Val  ::= #abstractVal  ( Val  ) [function]
     syntax Vals ::= #abstractVals ( Vals ) [function]
@@ -132,7 +135,7 @@ module FUN-SBC
 
     rule #abstractVal(_:ConstructorVal) => ?CV:ConstructorVal
     rule #abstractVal(CV:ClosureVal)    => CV:ClosureVal
-    rule #abstractVal([VS])             => [#abstractVals(VS)]
+    rule #abstractVal([VS])             => valList(#abstractVals(VS))
 ```
 
 ### Define `_subsumes?_`

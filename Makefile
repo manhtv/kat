@@ -21,7 +21,8 @@ test_output:=.build/logs
 .PHONY: deps deps-k deps-ocaml deps-tangle \
 		defn  defn-imp  defn-imp-kcompile  defn-imp-krun  defn-fun  defn-fun-krun  defn-fun-kcompile \
 		build build-imp build-imp-kcompile build-imp-krun build-fun build-fun-krun build-fun-kcompile \
-		test-bimc test-sbc test
+		test test-imp test-fun \
+		media
 
 all: build
 
@@ -167,3 +168,11 @@ $(test_dir)/sbced/%/compiled-kompiled/interpreter: $(test_dir)/sbced/%/compiled.
 $(test_dir)/sbced/%/compiled.runtime: $(test_dir)/sbced/%/compiled-kompiled/interpreter $(test_dir)/%.imp
 	eval $$(opam config env) ; \
 		time ( $(krun) --directory tests/sbced/$* -cN=10000 &>$@ ) &>> $@
+
+# Media
+# -----
+
+media: media/sbc-paper.pdf
+
+media/%.pdf: media/%.md
+	pandoc --from markdown --to latex --output $@ $<

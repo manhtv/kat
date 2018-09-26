@@ -43,6 +43,36 @@ Introduction
 Background
 ==========
 
+### Program Executions
+
+\renewcommand{\S}{\ensuremath{\mathcal{S}}}
+\renewcommand{\P}{\ensuremath{\mathcal{P}}}
+\renewcommand{\L}{\ensuremath{\mathcal{L}}}
+\newcommand{\R}{\ensuremath{\mathcal{R}}}
+
+\newcommand{\N}{\ensuremath{\mathbb{N}}}
+
+Given a transition system $(\S, \R : S \to \P(\S))$ with $\S$ a set of states and $\R$ a set of rules, we will call:
+
+-   A sequence $e : \N \to \P(\S)$ such that $e(i + 1) = \bigcup_{s \in e(i + 1)} R(S)$ an *execution* of $(\S, \R)$.
+
+-   $\R' : S \to \P(\S)$ is an *over-approximation* of $\R$ if $\forall s \in \S . \R(s) \subseteq \R'(s)$.
+    This defines a partial order $\R \leq \R'$, and lifts over transition systems as follows: $(\S, \R) \leq (\S, \R')$ iff $R \leq \R'$.
+
+-   A *labelling* of $\R$ is a finite set $\L$ such that $\forall s \in \S . R(s) = \bigcup_{l \in L} R_l(s)$ for $R_l$.
+
+-   A sequence $F : \N \to \L$ specifies an execution *strategy*.
+    The associated execution $F_s : \N \to \P(\S)$ of a given initial state $s \in \P(\S)$ is as follows:
+
+    \begin{align*}
+        F_s(n) = \begin{cases}
+                  s                         & n = 0 \\
+                  \R_{F(n - 1)}(F_s(n - 1)) & n > 0
+                 \end{cases}
+    \end{align*}
+
+    That is, $F_s$ is the restriction of $(\S, \R)$ to a transition system which starts in state $s$ and executes only the rules specified by $F$.
+
 ### Partial Evaluation
 
 -   Discuss projecting transition systems, how we can do two types of partial evaluation using symbolic execution:
@@ -54,7 +84,7 @@ Background
 
 ### \K{} Framework
 
--   Operational semantics framework 
+-   Operational semantics framework
 
 ![\K{} Overview **TODO**: Highlight "Compiler" Bubble](k-overview.png)
 
@@ -207,15 +237,18 @@ Methodology
 Overview
 --------
 
--   Partially evaluate the operational semantics of a language on a particular program $P$.
+We partially evaluate the operational semantics of a language $L$ on a particular program $P$ to produce a language $L_P$.
+The language $L_P$ can only execute program $P$.
 
--   For \K{}, we'll use the same symbolic execution engine used by the \K{} prover (**TODO**: cite OOPSLA'16).
+![Partial evaluation process](partial-evaluation-diagram.pdf)
 
--   To ensure termination, we will only execute each code-point once, but on a general enough input to ensure every behaviour is covered.
+To achieve the partial evaluation, we'll execute $P$ with an overapproximation of the language $\alpha(L)$ which is always terminating.
+$\alpha$ must have the property that every execution of $P$ in $L$ must be preserved (in a stuttering sense) in $\alpha(L)$.
 
--   End up with sequence of transitions from configurations to configurations, which can be expressed naturally as a \K{} definition where each transition is a rule.
-
--   New definition has a transition for every basic block of code, can directly execute the original program (but no other programs in the language[^fewOtherLanguages]).
+For \K{}, we'll use the same symbolic execution engine used by the \K{} prover (**TODO**: cite OOPSLA'16).
+To ensure termination, we will only execute each code-point once, but on a general enough input to ensure every behaviour is covered.
+End up with sequence of transitions from configurations to configurations, which can be expressed naturally as a \K{} definition where each transition is a rule.
+New definition has a transition for every basic block of code, can directly execute the original program (but no other programs in the language[^fewOtherLanguages]).
 
 [^fewOtherLanguages]: Actually *few* other programs in the language, as we take an overapproximation of the behaviour.
 

@@ -59,7 +59,7 @@ Given a transition system $(\S, \R : S \to \P(\S))$ with $\S$ a set of states an
 -   $\R' : S \to \P(\S)$ is an *over-approximation* of $\R$ if $\forall s \in \S . \R(s) \subseteq \R'(s)$.
     This defines a partial order $\R \leq \R'$, and lifts over transition systems as follows: $(\S, \R) \leq (\S, \R')$ iff $R \leq \R'$.
 
--   A *labelling* of $\R$ is a finite set $\L$ such that $\forall s \in \S . R(s) = \bigcup_{l \in L} R_l(s)$ for $R_l$.
+-   A *labelling* of $\R$ is a finite set $\L$ such that $\forall s \in \S . R(s) = \bigcup_{l \in L} R_l(s)$.
 
 -   A sequence $F : \N \to \L$ specifies an execution *strategy*.
     The associated execution $F_s : \N \to \P(\S)$ of a given initial state $s \in \P(\S)$ is as follows:
@@ -279,6 +279,37 @@ Algorithm
         c.  `_ => END`: Transition from a state in the transition system to an ending state.
 
         Nodes are not inserted for branching, as that would reduce potential dead-code elimination.
+
+Example Languages
+-----------------
+
+### IMP
+
+Four branching rules, one looping rule:
+
+```k
+    rule #branch => ^ iftrue | ^ iffalse | ^ divzero | ^ divnonzero
+    rule #loop   => ^ whileIMP
+```
+
+Abstraction operator turns every value in the memory to a fresh symbolic value:
+
+```k
+    syntax Strategy ::= #abstract ( Set )
+ // -------------------------------------
+    rule <s> abstract => #abstract(keys(MEM)) ... </s>
+         <mem> MEM </mem>
+
+    rule <s> #abstract(.Set) => . ... </s>
+    rule <s> #abstract((SetItem(X) => .Set) XS) ... </s>
+         <mem> MEM => MEM[X <- ?V:Int] </mem>
+```
+
+### FUN
+
+-   Many branching rules (30ish?)
+-   One looping rule when about to execute function body of recursively defined function.
+-   Abstraction operator forgets all values in current environment, and forgets how many nested environments we're in.
 
 Performance Evalutaion
 ======================

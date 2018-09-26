@@ -176,4 +176,4 @@ media: media/sbc-paper.pdf
 
 media/%.pdf: media/%.md
 	cd media \
-	    && pandoc --from markdown --to latex --output $*.pdf $*.md
+	    && pandoc --from markdown --to latex --table-of-contents --output $*.pdf $*.md

@@ -175,4 +175,5 @@ $(test_dir)/sbced/%/compiled.runtime: $(test_dir)/sbced/%/compiled-kompiled/inte
 media: media/sbc-paper.pdf
 
 media/%.pdf: media/%.md
-	pandoc --from markdown --to latex --output $@ $<
+	cd media \
+	    && pandoc --from markdown --to latex --output $*.pdf $*.md

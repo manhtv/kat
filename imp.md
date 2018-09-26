@@ -20,10 +20,11 @@ module IMP
 ```
 
 ```k
-    configuration <imp>
-                    <k> $PGM:Stmt </k>
-                    <mem> .Map </mem>
-                  </imp>
+    configuration
+      <imp>
+        <k>   $PGM:Stmt </k>
+        <mem> .Map      </mem>
+      </imp>
 
     syntax KResult ::= Int | Bool
 ```

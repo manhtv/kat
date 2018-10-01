@@ -54,7 +54,9 @@ Background
 
 Given a transition system $(\S, \R : S \to \P(\S))$ with $\S$ a set of states and $\R$ a set of rules, we will call:
 
--   A sequence $e : \N \to \P(\S)$ such that $e(i + 1) = \bigcup_{s \in e(i + 1)} R(S)$ an *execution* of $(\S, \R)$.
+-   The transition relation $\hat{\R} : \P(\S) \to \P(\S) : S \mapsto \bigcup_{s \in S} R(s)$.
+
+-   A sequence $e : \N \to \P(\S)$ such that $e(i + 1) = \hat{R}(e(i))$ an *execution* of $(\S, \R)$.
 
 -   $\R' : S \to \P(\S)$ is an *over-approximation* of $\R$ if $\forall s \in \S . \R(s) \subseteq \R'(s)$.
     This defines a partial order $\R \leq \R'$, and lifts over transition systems as follows: $(\S, \R) \leq (\S, \R')$ iff $R \leq \R'$.
@@ -169,7 +171,7 @@ Configuration has three cells: the `<k>` cell for the current computation, the `
 
 This language includes polymorphic algebraic data-types and supports pattern matching over said data-types.
 The function application operator is juxstaposition (similar to Haskell), and algebraic datatypes have constructors that start with uppercase identifiers.
-FUN is higher-order, and partial application of both constructors and functions is supported.
+FUN supports partial application of both constructors and functions.
 The operational semantics assumes that the input program has already been type-checked[^typeErasure].
 
 FUN also supports recursion, using a `letrec_in_` binding (counterpart to the non-recursive `let_in_` binding operator).

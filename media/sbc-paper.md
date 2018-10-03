@@ -52,14 +52,18 @@ Background
 
 \newcommand{\N}{\ensuremath{\mathbb{N}}}
 
-Given a transition system $(\S, \R : S \to \P(\S))$ with $\S$ a set of states and $\R$ a set of rules, we will call:
+\newcommand{\STUCK}{\ensuremath{\texttt{STUCK}}}
+\newcommand{\st}{\ensuremath{\ |\ }}
 
--   The transition relation $\hat{\R} : \P(\S) \to \P(\S) : S \mapsto \bigcup_{s \in S} R(s)$.
+Given a set of program states $S$, states $\S = \P(S) \cup \{ \STUCK \}$, and a set of rules $\R : S \to \S$, we have a *transition system* $(\S, \R)$.
 
--   A sequence $e : \N \to \P(\S)$ such that $e(i + 1) = \hat{R}(e(i))$ an *execution* of $(\S, \R)$.
+-   The *transition relation* is $\hat{\R} \subseteq \S \times \S$ is $\{ ( \STUCK , \STUCK ) \} \cup \{ (s_1, s_2) \in S \times S \cup \{ \STUCK \} \st s_2 \in \R(s_1) \}$.
 
--   $\R' : S \to \P(\S)$ is an *over-approximation* of $\R$ if $\forall s \in \S . \R(s) \subseteq \R'(s)$.
+-   $\R' : S \to \S$ is an *over-approximation* of $\R$ if $\forall s \in S . \R(s) \subseteq \R'(s)$.
     This defines a partial order $\R \leq \R'$, and lifts over transition systems as follows: $(\S, \R) \leq (\S, \R')$ iff $R \leq \R'$.
+
+-   A sequence $e : \N \to \S$ such that $e(i + 1) = \hat{R}(e(i))$ is an *execution* of $(\S, \R)$.
+    A *terminating* execution has some $n \in \N$ such that $\forall m > n . e(m) = \{ \STUCK \}$.
 
 -   A *labelling* of $\R$ is a finite set $\L$ such that $\forall s \in \S . R(s) = \bigcup_{l \in L} R_l(s)$.
 
@@ -93,8 +97,8 @@ Given a transition system $(\S, \R : S \to \P(\S))$ with $\S$ a set of states an
 Example Languages
 =================
 
-IMP: A simple imperative language
----------------------------------
+IMP: A simple imperative language {#imp-language}
+-------------------------------------------------
 
 ### State
 
@@ -151,8 +155,8 @@ The following observations about IMP are important for proving that the SBC algo
         rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k>
     ```
 
-FUN: A simple functional language
----------------------------------
+FUN: A simple functional language {#fun-language}
+-------------------------------------------------
 
 ### State
 
@@ -236,51 +240,130 @@ The following observations about FUN are important for proving that the SBC algo
 Methodology
 ===========
 
-Overview
---------
+The SBC algorithm was written directly in \K{} itself, taking advantage of some of \K{}'s features.
+We cover these features, then explain how this implements the abstract algorithm described above.
 
-We partially evaluate the operational semantics of a language $L$ on a particular program $P$ to produce a language $L_P$.
-The language $L_P$ can only execute program $P$.
+\K{} Features
+-------------
 
-![Partial evaluation process](partial-evaluation-diagram.pdf)
+The two main features of \K{} which enable us to write the algorithm directly as a \K{} theory are *configuration composition* and the *strategy language*.
 
-To achieve the partial evaluation, we'll execute $P$ with an overapproximation of the language $\alpha(L)$ which is always terminating.
-$\alpha$ must have the property that every execution of $P$ in $L$ must be preserved (in a stuttering sense) in $\alpha(L)$.
+### Configuration Composition
 
-For \K{}, we'll use the same symbolic execution engine used by the \K{} prover (**TODO**: cite OOPSLA'16).
-To ensure termination, we will only execute each code-point once, but on a general enough input to ensure every behaviour is covered.
-End up with sequence of transitions from configurations to configurations, which can be expressed naturally as a \K{} definition where each transition is a rule.
-New definition has a transition for every basic block of code, can directly execute the original program (but no other programs in the language[^fewOtherLanguages]).
+We would like to execute the original \K{} semantics directly, but wrap it in an execution harness which monitors and guides the execution.
+This will ensure that we are using the correct semantics (since we are directly using the original one), while letting us record execution or abstract the current state.
 
-[^fewOtherLanguages]: Actually *few* other programs in the language, as we take an overapproximation of the behaviour.
+The extra state we want to record is the set of rule traces which correspond execution in the abstracted semantics.
+We store those new transition in the `<rules>` cell, and have an extra `<states>` cell for internal bookkeeping.
+The `<s>` cell will be covered in the next section.
 
-Algorithm
----------
+```k
+    configuration
+      <kat>
+        <s>      .Strategy </s>
+        <states> .States   </states>
+        <rules>  .Rules    </rules>
+      </kat>
+```
 
--   Evaluate every "code point"/basic-block a single time.
+Most of the SBC algorithm can be written directly over this `<kat>` configuration in a completely language-independent way.
+When the language designer goes to instantiate SBC to a particular, configuration composition is used to specify the joint state.
+For example, instantiated to [IMP](#imp-language) results in the following configuration:
 
-    -   Define basic block (once in the basic block, will execute it fully to end unconditionally).
+```k
+    configuration
+      <kat-imp>
+        initKatCell(Init)
+        <harness> initImpCell(Init) </harness>
+      </kat-imp>
+```
 
-    -   User tells us which rules are "branching" and which are "looping" (so that we know where basic blocks begin and end).
+The placeholders `initKatCell(Init)` and `initImpCell(Init)` will expand out to the entire `<kat>` and `<imp>` configurations, respectively.
+In the module which composes these configurations, the language designer will also specify the remaining needed components of SBC.
 
-    -   Split state on branches.
+### Strategy Language
 
--   What about loops?
+The \K{} strategy language allows us to drive execution of a given language from within \K{} itself.
+Every \K{} definition has the `<s>` cell added to every rule by default, and the default initial strategy (contents of `<s>`) is `^ regular *`.
 
-    -   At loop head, need to "abstract" state so that the new symbolic state will cover all possible executions from that point.
-        Ensures that we only execute each loop exactly once, but that this covers all paths.
-        Abstraction operator is language specific (but *not* program specific), a little extra work for the builder of the semantics.
+For example, the following rule:
 
-    -   When an execution path reaches a loop head, save off the execution path as a new transition in the partially evaluated definition.
-        New definition only has three types of transitions in it:
+```imp
+    rule <k> int (X, XS => XS) ; ... </k>
+         <mem> MEM => MEM [ X <- 0 ] </mem>
+```
 
-        a.  `INIT => _`: Transition from the initial state to another state.
+will be expanded into the rule:
 
-        b.  `LOOP_i => LOOP_j`: Transition from one loop head to another loop head (potentially the same loop head).
+```imp
+    rule <k> int (X, XS => XS) ; ... </k>
+         <mem> MEM => MEM [ X <- 0 ] </mem>
+         <s> ^ regular => ~ regular ... </s>
+```
 
-        c.  `_ => END`: Transition from a state in the transition system to an ending state.
+This means that the rule will only fire when \K{}'s current strategy is to execute a `regular` rule.
+By default, every rule is tagged as `regular`, but the user can override the given tag, for example:
 
-        Nodes are not inserted for branching, as that would reduce potential dead-code elimination.
+```imp
+    rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k> [tag(whileIMP)]
+```
+
+will instead expand into:
+
+```imp
+    rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k>
+         <s> ^ whileIMP => ~ whileIMP ... </s>
+```
+
+We can use this to tell \K{} which rule to attempt to fire next, and record the results as we go.
+For example, if we picked the strategy `(^ regular ; record) *` (where `record` makes a copy of the current state on the `<states>` cell), we would get a recording of all traces which only execute `regular` rules.
+
+Semantics Based Compilation
+---------------------------
+
+The algorithm for a single SBC step in \K{}'s strategy language is as follows:
+
+1.  If we can extend the current execution trace with a `#loop`ing rule:
+
+    a.  Make a new rule with our current execution trace (`mk-rule STATE`).
+    b.  Abstract the current state (`pop-fresh STATE ; abstract`).
+    c.  Execute the `#loop`ing rules on the abstracted state, and new traces with those states.
+
+2.  Else if we can extend the current execution with a `#branch`ing rule:
+
+    a.  Split the current execution on all the `#branch`ing rules that can be applied.
+
+3.  Else if we can extend the current execution with either a `^ regular` or `#normal` rule:
+
+    a.  Extend the current execution with as many `^ regular` or `#normal` as possible.
+
+4.  Else we must be on the terminal state of an execution path, make a new rule with the collected path.
+
+```k
+    rule <states> STATE : STATES => STATES </states>
+         <s> compile-step
+          => if try-state? STATE < #loop >
+              then ( mk-rule STATE
+                   ; pop-fresh STATE
+                   ; abstract
+                   ; init-rules #loop
+                   )
+             else if try-state? STATE < #branch >
+              then ( split-rules STATE #branch
+                   )
+             else if try-state? STATE < ^ regular | #normal >
+              then ( push STATE < (^ regular | #normal) * > )
+             else  ( mk-rule STATE )
+             ...
+         </s>
+```
+
+Given the above algorithm, the user must supply:
+
+-   The `#normal`, `#branch`, and `#loop` rule tags (by labelling the rules appropriately).
+-   The `abstract` operator to use whenever a `#loop` rule can fire.
+
+The supplied `abstract` operator must have the properties of $\alpha$ above; that is, every execution which uses `abstract ; #loop` instead of `#loop` must terminate.
 
 Example Languages
 -----------------
@@ -333,3 +416,55 @@ Conclusion
 ==========
 
 -   It's great, use it!
+
+Misc
+====
+
+We execute $P$ in a modified semantics $\alpha(L)$ which:
+
+1.  Records execution traces $e_i$ with $e_i(0) = \hat{P}$.
+2.  Always terminates.
+3.  Overapproximates the behaviour of $L$ (for $(\S, \R) = \L$.
+
+We partially evaluate the operational semantics of a language $L$ on a particular program $P$ to produce a language $L_P$.
+The language $L_P$ can only execute program $P$.
+
+![Partial evaluation process](partial-evaluation-diagram.pdf)
+
+To achieve the partial evaluation, we'll execute $P$ with an overapproximation of the language $\alpha(L)$ which is always terminating.
+$\alpha$ must have the property that every execution of $P$ in $L$ must be preserved (in a stuttering sense) in $\alpha(L)$.
+
+For \K{}, we'll use the same symbolic execution engine used by the \K{} prover (**TODO**: cite OOPSLA'16).
+To ensure termination, we will only execute each code-point once, but on a general enough input to ensure every behaviour is covered.
+End up with sequence of transitions from configurations to configurations, which can be expressed naturally as a \K{} definition where each transition is a rule.
+New definition has a transition for every basic block of code, can directly execute the original program (but no other programs in the language[^fewOtherLanguages]).
+
+[^fewOtherLanguages]: Actually *few* other programs in the language, as we take an overapproximation of the behaviour.
+
+Algorithm
+---------
+
+-   Evaluate every "code point"/basic-block a single time.
+
+    -   Define basic block (once in the basic block, will execute it fully to end unconditionally).
+
+    -   User tells us which rules are "branching" and which are "looping" (so that we know where basic blocks begin and end).
+
+    -   Split state on branches.
+
+-   What about loops?
+
+    -   At loop head, need to "abstract" state so that the new symbolic state will cover all possible executions from that point.
+        Ensures that we only execute each loop exactly once, but that this covers all paths.
+        Abstraction operator is language specific (but *not* program specific), a little extra work for the builder of the semantics.
+
+    -   When an execution path reaches a loop head, save off the execution path as a new transition in the partially evaluated definition.
+        New definition only has three types of transitions in it:
+
+        a.  `INIT => _`: Transition from the initial state to another state.
+
+        b.  `LOOP_i => LOOP_j`: Transition from one loop head to another loop head (potentially the same loop head).
+
+        c.  `_ => END`: Transition from a state in the transition system to an ending state.
+
+        Nodes are not inserted for branching, as that would reduce potential dead-code elimination.

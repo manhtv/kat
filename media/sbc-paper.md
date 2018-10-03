@@ -137,7 +137,7 @@ while (0 <= n) {
 
 We would like to summarize this program as the following transition system:
 
-![IMP program `sum.imp` transition system **TODO**](imp-sum-transition.png)
+![IMP program `sum.imp` transition system **TODO**](imp-sum-transition.jpg)
 
 ### Important Observations
 

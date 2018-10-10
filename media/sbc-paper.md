@@ -255,7 +255,7 @@ This will ensure that we are using the correct semantics (since we are directly 
 
 The extra state we want to record is the set of rule traces which correspond execution in the abstracted semantics.
 We store those new transition in the `<rules>` cell, and have an extra `<states>` cell for internal bookkeeping.
-The `<s>` cell will be covered in the next section.
+The *strategy cell* (`<s>`) will be covered in the next section.
 
 ```k
     configuration
@@ -285,15 +285,30 @@ In the module which composes these configurations, the language designer will al
 
 The \K{} strategy language allows us to drive execution of a given language from within \K{} itself.
 Every \K{} definition has the `<s>` cell added to every rule by default, and the default initial strategy (contents of `<s>`) is `^ regular *`.
+In this example, `regular` is a *rule tag*, `^_` says "apply this rule tag", and `_*` says apply this strategy as many times as possible.
 
-For example, the following rule:
+A rule can be tagged with the `tag(_)` attribute; for example, the following rule which desugars a `while (_)_` loop into an `if (_) {_} else {_}` statement has been tagged as `whileIMP`:
+
+```imp
+    rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k> [tag(whileIMP)]
+```
+
+The following rule, initializes newly declared variables `X , XS` to `0` in the `<mem>` cell, will get the default `tag(regular)` added.
 
 ```imp
     rule <k> int (X, XS => XS) ; ... </k>
          <mem> MEM => MEM [ X <- 0 ] </mem>
 ```
 
-will be expanded into the rule:
+At kompile time, these rules will be expanded to also have an `<s>` cell which drives application of that rule.
+The rule for desugaring while loops becomes:
+
+```imp
+    rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k>
+         <s> ^ whileIMP => ~ whileIMP ... </s>
+```
+
+And variable initialization becomes:
 
 ```imp
     rule <k> int (X, XS => XS) ; ... </k>
@@ -301,22 +316,15 @@ will be expanded into the rule:
          <s> ^ regular => ~ regular ... </s>
 ```
 
-This means that the rule will only fire when \K{}'s current strategy is to execute a `regular` rule.
-By default, every rule is tagged as `regular`, but the user can override the given tag, for example:
+This means that the rule will only fire when \K{}'s current strategy is to execute that given rule tag.
+The right hand sides `~ whileIMP` and `~ regular` can have other rules which process them, or can be discarded (as in the following example):
 
 ```imp
-    rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k> [tag(whileIMP)]
-```
-
-will instead expand into:
-
-```imp
-    rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k>
-         <s> ^ whileIMP => ~ whileIMP ... </s>
+    rule <s> ~ SA:StrategyApplied => . ... </s>
 ```
 
 We can use this to tell \K{} which rule to attempt to fire next, and record the results as we go.
-For example, if we picked the strategy `(^ regular ; record) *` (where `record` makes a copy of the current state on the `<states>` cell), we would get a recording of all traces which only execute `regular` rules.
+For example, if we picked the strategy `(^ regular ; push) *` (where `push` pushes a copy of the current state onto the `<states>` cell), we would get a recording of all traces which only execute `regular` rules from the initial state.
 
 Semantics Based Compilation
 ---------------------------

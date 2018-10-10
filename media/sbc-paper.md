@@ -329,6 +329,22 @@ For example, if we picked the strategy `(^ regular ; push) *` (where `push` push
 Semantics Based Compilation
 ---------------------------
 
+What I would like the algorithm to be:
+
+```
+    alpha(tag) = tag if tag in (#normal #branch SetItem(^ regular))
+
+    split-rules(S)        = dup-rule ; #split-rules(S) ; drop-rule
+    #split-rules(S1 | S2) = #split-rules(S1) ; #split-rules(S2)
+    #split-rules(S)       = try? S
+                          ; ? extend-rule(S) ; swap-rule ; dup-rule
+                            : skip
+
+    new-rule(whileIMP) = end-rule ; pop-fresh ; ^ abstractWhile ; init-rule
+
+    compile => init-rule ; (#normal | split-rules(#branch) | split-rules(#loop)) * ; end-rule
+```
+
 The algorithm for a single SBC step in \K{}'s strategy language is as follows:
 
 1.  If we can extend the current execution trace with a `#loop`ing rule:

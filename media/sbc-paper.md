@@ -12,7 +12,7 @@ Abstract
 --------
 
 Implementing compilers takes a long time and is error prone; it's easy to introduce differences in behaviour between various compilers.
-Instead, we can build derive an initial compiler directly from a formal operational semantics using partial evaluation.
+Instead, we can derive an initial compiler directly from a formal operational semantics using partial evaluation.
 This approach is correct by construction, if you trust the formal specification then the derived compiler is correct.
 
 We demonstrate this on two languages, IMP (a simple imperative language), and FUN (a functional language with algebraic datatypes) using the \K{} Framework.
@@ -267,7 +267,7 @@ The *strategy cell* (`<s>`) will be covered in the next section.
 ```
 
 Most of the SBC algorithm can be written directly over this `<kat>` configuration in a completely language-independent way.
-When the language designer goes to instantiate SBC to a particular, configuration composition is used to specify the joint state.
+When the language designer goes to instantiate SBC to a particular language, configuration composition is used to specify the joint state.
 For example, instantiated to [IMP](#imp-language) results in the following configuration:
 
 ```k
@@ -293,7 +293,7 @@ A rule can be tagged with the `tag(_)` attribute; for example, the following rul
     rule <k> while (B) STMT => if (B) {STMT while (B) STMT} else {} ... </k> [tag(whileIMP)]
 ```
 
-The following rule, initializes newly declared variables `X , XS` to `0` in the `<mem>` cell, will get the default `tag(regular)` added.
+The following rule initializes newly declared variables `X , XS` to `0` in the `<mem>` cell, will get the default `tag(regular)` added.
 
 ```imp
     rule <k> int (X, XS => XS) ; ... </k>
